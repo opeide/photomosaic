@@ -15,7 +15,7 @@ _tile_histograms = []
 _tile_flat = []
 _placed_tiles = defaultdict(str)
 
-def create_mosaic(path_tiles, path_target, tile_size, tile_resolution):
+def create_mosaic(path_tiles, path_target, tile_size, tile_resolution, duplicate_radius):
     #searches using chunks of tile size, adds tiles with their true (higher) resolution to image mosaic
     tiles_lowres, tiles_hires, tile_paths = load_tiles(path_tiles, tile_size, tile_resolution)
 
@@ -33,7 +33,7 @@ def create_mosaic(path_tiles, path_target, tile_size, tile_resolution):
     print('matching tiles')
     for img_chunk, chunk_indices in target_chunkinator:
         iter += 1
-        best_tile = get_best_tile(img_chunk, tiles_lowres, tiles_hires, tile_paths, chunk_indices)
+        best_tile = get_best_tile(img_chunk, tiles_lowres, tiles_hires, tile_paths, chunk_indices, duplicate_radius)
         result_img = add_tile_to_image(result_img, best_tile, chunk_indices)
         if time.time() > t + 1:
             t = time.time()
@@ -65,7 +65,7 @@ def tile_within_radius(tile_path, indices, radius):
     return False
 
 #todo: Supress similar matces within a radius
-def get_best_tile(target, tiles_lowres, tiles_hires, tile_paths, chunk_indices):
+def get_best_tile(target, tiles_lowres, tiles_hires, tile_paths, chunk_indices, duplicate_radius):
     if not _tile_flat:    #simple dynamic programming
         for tile in tiles_lowres:
             tile_flat = np.array(tile).flatten() / 255.0
@@ -77,7 +77,7 @@ def get_best_tile(target, tiles_lowres, tiles_hires, tile_paths, chunk_indices):
     best_index = None
     for index, tile_flat in enumerate(_tile_flat):
         diff = np.linalg.norm(target_flat-tile_flat)
-        if (lowest_diff is None) or (diff < lowest_diff and not tile_within_radius(tile_paths[index], chunk_indices, 2)):
+        if (lowest_diff is None) or (diff < lowest_diff and not tile_within_radius(tile_paths[index], chunk_indices, duplicate_radius)):
             lowest_diff = diff
             best_index = index
             _placed_tiles[chunk_indices] = tile_paths[best_index]
@@ -85,7 +85,7 @@ def get_best_tile(target, tiles_lowres, tiles_hires, tile_paths, chunk_indices):
     best_tile = tiles_hires[best_index]
     best_tile_img = Image.fromarray(best_tile)
     target_img = Image.fromarray(target).resize(best_tile.shape[0:2], Image.ANTIALIAS)
-    blended_tile = np.array(Image.blend(best_tile_img, target_img, alpha=0.25))
+    blended_tile = np.array(Image.blend(best_tile_img, target_img, alpha=0.1))
 
     return blended_tile
 
@@ -117,10 +117,10 @@ def show_image(img):
 
 
 if __name__ == '__main__':
-    long_args = ['tile_folder=', 'target_path=', 'save_path=', 'tile_size=', 'tile_resolution=']
+    long_args = ['tile_folder=', 'target_path=', 'save_path=', 'tile_size=', 'tile_resolution=', 'duplicate_radius=']
     opts, _ = getopt.getopt(sys.argv[1:], '', long_args)
 
-    missing_args = ['--tile_folder', '--target_path', '--save_path', '--tile_size', '--tile_resolution']
+    missing_args = ['--tile_folder', '--target_path', '--save_path', '--tile_size', '--tile_resolution', '--duplicate_radius']
     received_args = {}
     for arg, val in opts:
         try:
@@ -137,8 +137,9 @@ if __name__ == '__main__':
     path_save = received_args['--save_path']
     tile_size = int(received_args['--tile_size'])
     tile_resolution = int(received_args['--tile_resolution'])
+    duplicate_radius = int(received_args['--duplicate_radius'])
 
-    mosaic = create_mosaic(path_tiles, path_target, tile_size, tile_resolution)
+    mosaic = create_mosaic(path_tiles, path_target, tile_size, tile_resolution, duplicate_radius)
     show_image(mosaic)
     mosaic_pil = Image.fromarray(mosaic)
     mosaic_pil.save(path_save)
