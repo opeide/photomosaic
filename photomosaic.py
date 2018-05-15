@@ -11,14 +11,15 @@ import getopt
 
 
 _tile_histograms = []
-_tile_flats = []
+_tile_flat = []
 
 
-def create_mosaic(path_tiles, path_target, tile_size):
+def create_mosaic(path_tiles, path_target, img_size, tile_size):
     tiles = load_downsampled(path_tiles, tile_size)
 
-    target = load_image(path_target)
+    target = load_image(path_target, img_size)
 
+    #make divisible by tile size
     result_shape = np.array(target.shape) / np.array(tile_size+[1])
     result_shape = result_shape.astype(dtype=int)*(np.array(tile_size+[1]))
     result_img = np.zeros(shape=result_shape, dtype=np.uint8)
@@ -56,25 +57,32 @@ def add_tile_to_image(img, tile, tile_location):
     return img
 
 
-def get_best_match(target, source, loss_type='norm'):
+
+#todo: Supress similar matces within a radius
+def get_best_match(target, tiles, loss_type='norm'):
     if loss_type == 'norm':
-        if not _tile_flats:    #simple dynamic programming
-            for img in source:
-                flat = img.flatten()/255.0
-                _tile_flats.append([img, flat])
-        flat_target = target.flatten()/255.0
-        lowest_diff = 999.0
-        closest_img = None
-        for img, flat_img in _tile_flats:
-            diff = np.linalg.norm(flat_target-flat_img)
-            if diff < lowest_diff:
+        target_flat = target.flatten()/255.0
+        if not _tile_flat:    #simple dynamic programming
+            for tile in tiles:
+                tile_flat = np.array(tile).flatten() / 255.0
+                _tile_flat.append(tile_flat)
+
+
+        lowest_diff = None
+        best_flat = None
+        for tile_flat in _tile_flat:
+            diff = np.linalg.norm(target_flat-tile_flat)
+            if (lowest_diff is None) or diff < lowest_diff:
                 lowest_diff = diff
-                closest_img = img
-        return closest_img
+                best_flat = tile_flat
+        best_tile = (best_flat*255).astype(np.uint8)
+        best_tile = np.reshape(best_tile, target.shape)
+        best_tile = np.array(Image.blend(Image.fromarray(best_tile), Image.fromarray(target), alpha=0.25))
+        return best_tile
 
     elif loss_type == 'histogram':
         if not _tile_histograms:    #simple dynamic programming
-            for img in source:
+            for img in tiles:
                 hist, _ = np.histogram(img.flatten(), bins=32, range=[0, 255])
                 _tile_histograms.append([img, hist])
         hist_target, _ = np.histogram(target.flatten(), bins=32, range=[0, 255])
@@ -110,8 +118,11 @@ def load_downsampled(source, size):
     return images
 
 
-def load_image(path):
-    return np.array(Image.open(path))
+def load_image(path, img_size=None):
+    img = Image.open(path)
+    if img_size is not None:
+        img = img.resize(img_size, Image.ANTIALIAS)
+    return np.array(img)
 
 
 def show_image(img):
@@ -120,10 +131,10 @@ def show_image(img):
 
 
 if __name__ == '__main__':
-    long_args = ['source=', 'target=', 'save_path=', 'tile_size=']
+    long_args = ['source=', 'target=', 'save_path=', 'img_size_x=', 'img_size_y=', 'tile_size=']
     opts, _ = getopt.getopt(sys.argv[1:], '', long_args)
 
-    missing_args = ['--source', '--target', '--save_path', '--tile_size']
+    missing_args = ['--source', '--target', '--save_path', '--tile_size', '--img_size_x', '--img_size_y']
     received_args = {}
     for arg, val in opts:
         try:
@@ -138,10 +149,11 @@ if __name__ == '__main__':
     path_tiles = received_args['--source']
     path_target = received_args['--target']
     path_result = received_args['--save_path']
+    img_size = (int(received_args['--img_size_x']), int(received_args['--img_size_y']))
     n = int(received_args['--tile_size'])
     tile_size = [n, n]
 
-    mosaic = create_mosaic(path_tiles, path_target, tile_size)
+    mosaic = create_mosaic(path_tiles, path_target, img_size, tile_size)
     show_image(mosaic)
     mosaic_pil = Image.fromarray(mosaic)
     mosaic_pil.save(path_result)
