@@ -14,6 +14,7 @@ from collections import defaultdict
 _tile_histograms = []
 _tile_flat = []
 _placed_tiles = defaultdict(str)
+_disc_offsets = []
 
 def create_mosaic(path_tiles, path_target, tile_size, tile_resolution, duplicate_radius):
     #searches using chunks of tile size, adds tiles with their true (higher) resolution to image mosaic
@@ -55,10 +56,9 @@ def add_tile_to_image(img, tile, chunk_indices):
     img[m*resolution:(m+1)*resolution, n*resolution:(n+1)*resolution, :] = tile
     return img
 
-def tile_within_radius(tile_path, indices, radius):
+def tile_within_radius(tile_path, indices):
     m0, n0 = indices
-    for dm in range(-radius, radius+1, 1):
-        for dn in range(-radius, radius+1, 1):
+    for dm, dn in _disc_offsets:
             key = (m0+dm, n0+dn)
             if _placed_tiles[key] == tile_path:
                 return True
@@ -77,7 +77,7 @@ def get_best_tile(target, tiles_lowres, tiles_hires, tile_paths, chunk_indices, 
     best_index = None
     for index, tile_flat in enumerate(_tile_flat):
         diff = np.linalg.norm(target_flat-tile_flat)
-        if (lowest_diff is None) or (diff < lowest_diff and not tile_within_radius(tile_paths[index], chunk_indices, duplicate_radius)):
+        if (lowest_diff is None) or (diff < lowest_diff and not tile_within_radius(tile_paths[index], chunk_indices)):
             lowest_diff = diff
             best_index = index
             _placed_tiles[chunk_indices] = tile_paths[best_index]
@@ -116,6 +116,12 @@ def show_image(img):
     plt.show()
 
 
+def create_disc_offsets(radius):
+    for dm in range(-radius, radius+1, 1):
+        for dn in range(-radius, radius+1, 1):
+            if np.sqrt(dm**2 + dn**2) <= radius:
+                _disc_offsets.append((dm, dn))
+
 if __name__ == '__main__':
     long_args = ['tile_folder=', 'target_path=', 'save_path=', 'tile_size=', 'tile_resolution=', 'duplicate_radius=']
     opts, _ = getopt.getopt(sys.argv[1:], '', long_args)
@@ -138,6 +144,9 @@ if __name__ == '__main__':
     tile_size = int(received_args['--tile_size'])
     tile_resolution = int(received_args['--tile_resolution'])
     duplicate_radius = int(received_args['--duplicate_radius'])
+
+
+    create_disc_offsets(duplicate_radius)
 
     mosaic = create_mosaic(path_tiles, path_target, tile_size, tile_resolution, duplicate_radius)
     show_image(mosaic)
