@@ -85,7 +85,7 @@ def get_best_tile(target, tiles_lowres, tiles_hires, tile_paths, chunk_indices, 
     best_tile = tiles_hires[best_index]
     best_tile_img = Image.fromarray(best_tile)
     target_img = Image.fromarray(target).resize(best_tile.shape[0:2], Image.ANTIALIAS)
-    blended_tile = np.array(Image.blend(best_tile_img, target_img, alpha=0.1))
+    blended_tile = np.array(Image.blend(best_tile_img, target_img, alpha=0.2))
 
     return blended_tile
 
