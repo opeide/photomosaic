@@ -18,9 +18,8 @@ _disc_offsets = []
 
 def create_mosaic(path_tiles, path_target, tile_size, tile_resolution, duplicate_radius):
     #searches using chunks of tile size, adds tiles with their true (higher) resolution to image mosaic
-    tiles_lowres, tiles_hires, tile_paths = load_tiles(path_tiles, tile_size, tile_resolution)
-
     target = load_image(path_target)
+    tiles_lowres, tiles_hires, tile_paths = load_tiles(path_tiles, tile_size, tile_resolution)
 
     #crop to multiple of hires tile resolution
     result_num_tiles = np.floor_divide(np.array(target.shape), np.array([tile_size, tile_size, 1])) #1 is added for the rgb channel
