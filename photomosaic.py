@@ -9,7 +9,7 @@ import time
 import sys
 import getopt
 from collections import defaultdict
-
+import pickle
 
 _tile_histograms = []
 _tile_flat = []
@@ -90,18 +90,42 @@ def get_best_tile(target, tiles_lowres, tiles_hires, tile_paths, chunk_indices, 
     return blended_tile
 
 
-def load_tiles(tiles_path, size, resolution):
+def load_tiles(tiles_path, res_low, res_high):
+    #return lowres, hires, paths
     print('Loading images and downsampling,', tiles_path)
-    tiles_lowres = []
-    tiles_hires = []
-    tiles_paths = []
-    for tile_img_path in glob.glob(tiles_path+'*.jpg'):
-        tile_low = load_image(tile_img_path, size=size)
-        tile_hi = load_image(tile_img_path, size=resolution)
-        tiles_lowres.append(tile_low)
-        tiles_hires.append(tile_hi)
-        tiles_paths.append(tile_img_path)
-    return tiles_lowres, tiles_hires, tiles_paths
+    downsampled_tiles = {res_low: [], res_high: []}
+    current_tiles_paths = list(glob.glob(tiles_path + '*.jpg'))
+
+    for res in downsampled_tiles.keys():
+        cache_path = tiles_path + 'cache_{}.pickle'.format(res)
+        try:
+            with open(cache_path, 'rb') as f:
+                downsampled_tiles[res], cached_tiles_paths = pickle.load(f)
+                if cached_tiles_paths != current_tiles_paths:
+                    raise Exception('Tile cache for res {} outdated'.format(res))
+        except Exception as e:
+            print(e)
+            print('Creating cache for res {}'.format(res))
+            downsampled_tiles[res] = downsample_tiles_folder(tiles_path, res)
+            with open(cache_path, 'wb') as f:
+                pickle.dump((downsampled_tiles[res], current_tiles_paths), f)
+        else:
+            print('Loaded cached res {}'.format(res))
+
+    return downsampled_tiles[res_low], downsampled_tiles[res_high], current_tiles_paths
+
+
+def downsample_tiles_folder(tiles_path, res):
+    tiles_downsampled = []
+    n_files = len(glob.glob(tiles_path + '*.jpg'))
+    for i, tile_img_path in enumerate(glob.glob(tiles_path + '*.jpg')):
+        if i%25 == 0:
+            print('\tdownsampling {}%'.format(float(i)/float(n_files)))
+        tile_down = load_image(tile_img_path, size=res)
+        tiles_downsampled.append(tile_down)
+    print('\tdownsampling 100%')
+    return tiles_downsampled
+
 
 
 def load_image(path, size=None):
