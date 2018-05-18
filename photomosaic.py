@@ -64,7 +64,7 @@ def tile_within_radius(tile_path, indices):
     return False
 
 #todo: Supress similar matces within a radius
-def get_best_tile(target, tiles_lowres, tiles_hires, tile_paths, chunk_indices, duplicate_radius):
+def get_best_tile(target, tiles_lowres, tiles_hires, tile_paths, chunk_indices):
     if not _tile_flat:    #simple dynamic programming
         for tile in tiles_lowres:
             tile_flat = np.array(tile).flatten() / 255.0
